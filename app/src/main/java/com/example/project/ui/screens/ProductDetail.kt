@@ -67,7 +67,7 @@ fun ProductDetail(
     val screenHeight = configuration.screenHeightDp.dp
 
     Scaffold(
-        // We'll remove the TopAppBar from here to place the back button manually
+        containerColor = Color(0xFFFAFAFA),
     ) { paddingValues ->
         Column(
             modifier = Modifier

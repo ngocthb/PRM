@@ -6,9 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
@@ -19,9 +17,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
 import com.example.project.ui.screens.components.BottomNavigationBar
+import androidx.compose.ui.platform.LocalContext
+import com.example.project.utils.NotificationUtils
 
 data class CartItem(
     val name: String,
@@ -30,7 +31,7 @@ data class CartItem(
     val originalPrice: Double,
     val imageUrl: String,
     var quantity: Int,
-    var isSelected: Boolean = true // mới: để lưu trạng thái tick
+    var isSelected: Boolean = true
 )
 
 @Composable
@@ -41,81 +42,109 @@ fun CartScreen(navController: NavHostController) {
                 CartItem("Tomato", "Vegetable", 18.0, 18.0, "https://i.pravatar.cc/150?img=1", 3),
                 CartItem("Chocolate", "Bakery", 13.0, 15.0, "https://i.pravatar.cc/150?img=2", 7),
                 CartItem("Avocado", "Fruit", 7.0, 10.0, "https://i.pravatar.cc/150?img=3", 2),
-                CartItem("Milk", "Dairy", 15.0, 21.0, "https://i.pravatar.cc/150?img=4", 5),
-                CartItem("Milk", "Dairy", 15.0, 21.0, "https://i.pravatar.cc/150?img=4", 5),
-                CartItem("Milk", "Dairy", 15.0, 21.0, "https://i.pravatar.cc/150?img=4", 5),
-                CartItem("Milk", "Dairy", 15.0, 21.0, "https://i.pravatar.cc/150?img=4", 5),
                 CartItem("Milk", "Dairy", 15.0, 21.0, "https://i.pravatar.cc/150?img=4", 5)
-
             )
         )
     }
 
-    // Chỉ tính tổng dựa trên các item được chọn
     val subtotal = cartItems.filter { it.isSelected }.sumOf { it.price * it.quantity }
     val tax = subtotal * 0.05
     val total = subtotal + tax
+    val primaryColor = Color(0xFF6588E6)
 
-    Scaffold(bottomBar = { BottomNavigationBar(navController) }) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Scaffold(
+        containerColor = Color(0xFFFAFAFA),
+        bottomBar = { BottomNavigationBar(navController) }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // Header
             Box(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp)
             ) {
                 Text(
                     text = "My Cart",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = Color(0xFF6588E6),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = primaryColor,
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
 
+            // List of cart items
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 12.dp)
             ) {
                 itemsIndexed(cartItems) { index, item ->
+                    val context = LocalContext.current
                     CartItemRow(
-                        item,
+                        item = item,
                         onQuantityChange = { newQty ->
-                            cartItems = cartItems.toMutableList().also { it[index] = it[index].copy(quantity = newQty) }
+                            cartItems = cartItems.toMutableList().also {
+                                it[index] = it[index].copy(quantity = newQty)
+                            }
+                            val cartCount = cartItems.sumOf { it.quantity }
+                            NotificationUtils.showCartBadgeNotification(context, cartCount)
                         },
                         onRemove = {
                             cartItems = cartItems.toMutableList().also { it.removeAt(index) }
+                            val cartCount = cartItems.sumOf { it.quantity }
+                            NotificationUtils.showCartBadgeNotification(context, cartCount)
                         },
                         onSelectChange = { isSelected ->
-                            cartItems = cartItems.toMutableList().also { it[index] = it[index].copy(isSelected = isSelected) }
+                            cartItems = cartItems.toMutableList().also {
+                                it[index] = it[index].copy(isSelected = isSelected)
+                            }
+                            val cartCount = cartItems.filter { it.isSelected }.sumOf { it.quantity }
                         }
                     )
                 }
             }
 
-            Column(modifier = Modifier.fillMaxWidth()) {
+            // Totals
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+            ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Subtotal", color = Color.Gray)
-                    Text("$${"%.2f".format(subtotal)}")
+                    Text("$${"%.2f".format(subtotal)}", fontWeight = FontWeight.Bold)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Tax (5%)", color = Color.Gray)
-                    Text("$${"%.2f".format(tax)}")
+                    Text("$${"%.2f".format(tax)}", fontWeight = FontWeight.Bold)
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Total", fontWeight = FontWeight.Bold)
-                    Text("$${"%.2f".format(total)}", fontWeight = FontWeight.Bold)
+                    Text("Total", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("$${"%.2f".format(total)}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Checkout button
             Button(
-                onClick = { /* handle checkout */ },
+                onClick = { /* checkout */ },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 110.dp, start = 12.dp, end = 12.dp)
-                    .height(60.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6588E6)),
-                shape = RoundedCornerShape(12.dp)
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Checkout", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Checkout",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
             }
         }
     }
@@ -131,58 +160,65 @@ fun CartItemRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 10.dp),
+            .clip(RoundedCornerShape(12.dp))
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Checkbox để chọn item
         Checkbox(
             checked = item.isSelected,
             onCheckedChange = { onSelectChange(it) }
         )
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         Image(
             painter = rememberAsyncImagePainter(item.imageUrl),
             contentDescription = item.name,
-            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp))
+            modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp))
         )
 
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(item.name, fontWeight = FontWeight.Bold)
-            Text(item.category, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            Text(item.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(item.category, color = Color.Gray, fontSize = 13.sp)
             Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("$${item.price}", fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.width(4.dp))
-                if (item.originalPrice > item.price)
-                    Text("$${item.originalPrice}", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                if (item.originalPrice > item.price) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "$${item.originalPrice}",
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("-", modifier = Modifier
-                .clickable { if (item.quantity > 0) onQuantityChange(item.quantity - 1) }
-                .padding(8.dp))
+                .clickable { if (item.quantity > 1) onQuantityChange(item.quantity - 1) }
+                .padding(horizontal = 6.dp, vertical = 4.dp))
             Text(item.quantity.toString(), modifier = Modifier.padding(horizontal = 4.dp))
             Text("+", modifier = Modifier
                 .clickable { onQuantityChange(item.quantity + 1) }
-                .padding(8.dp))
+                .padding(horizontal = 6.dp, vertical = 4.dp))
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         Icon(
             imageVector = Icons.Default.Delete,
             contentDescription = "Remove item",
             tint = Color.Red,
             modifier = Modifier
-                .size(24.dp)
+                .size(28.dp)
                 .clickable { onRemove() }
         )
     }
 }
+
+

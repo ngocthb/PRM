@@ -157,8 +157,11 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         }
 
         composable(Destinations.ShopMap) {
-            ShopMapScreen()
+            ShopMapScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
+
 
 
     }

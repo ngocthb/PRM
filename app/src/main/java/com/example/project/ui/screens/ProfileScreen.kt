@@ -43,7 +43,7 @@ fun ProfileScreen(navController: NavHostController) {
         ProfileOption("Log Out", Icons.Outlined.Logout, Color(0xFFF44336)) { /* TODO */ } // tím
     )
 
-    Scaffold(bottomBar = { BottomNavigationBar(navController) }) { padding ->
+    Scaffold(bottomBar = { BottomNavigationBar(navController) }, containerColor = Color(0xFFFAFAFA),) { padding ->
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -55,8 +55,8 @@ fun ProfileScreen(navController: NavHostController) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-                .background(Color.White),
+                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)),
+
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(32.dp))

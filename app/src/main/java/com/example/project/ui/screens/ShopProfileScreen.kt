@@ -74,7 +74,7 @@ fun ShopProfileScreen(
 
     var selectedTab by remember { mutableStateOf(0) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize() .background(Color(0xFFFAFAFA)) ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()

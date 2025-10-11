@@ -48,6 +48,7 @@ fun ChatListScreen(
     )
 
     Scaffold(
+        containerColor = Color(0xFFFAFAFA),
         bottomBar = { BottomNavigationBar(navController) }
     ) { padding ->
         Column(

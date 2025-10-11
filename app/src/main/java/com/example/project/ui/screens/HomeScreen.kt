@@ -13,6 +13,10 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.project.model.Product
 import com.example.project.ui.screens.components.*
+import com.example.project.ui.viewmodel.HomeViewModel
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+
 
 @Composable
 fun HomeScreen(
@@ -20,7 +24,15 @@ fun HomeScreen(
     onCategorySelected: (String) -> Unit = {},
     onProductClick: (Product) -> Unit = {},
     navController: NavController,
+    viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
 ) {
+    val currency by viewModel.currency.collectAsState()
+
+    // Gọi API 1 lần khi màn hình mở
+    LaunchedEffect(Unit) {
+        viewModel.getCurrencyRate()
+    }
+
     var selectedCategory by remember { mutableStateOf(categories.first()) }
     var selectedCategoryId by remember { mutableStateOf<Int?>(null) }
     val allProducts = remember {
@@ -43,6 +55,7 @@ fun HomeScreen(
     }
 
     Scaffold(
+        containerColor = Color(0xFFFAFAFA),
         bottomBar = { BottomNavigationBar(navController) }
     ) { innerPadding ->
         LazyVerticalGrid(
@@ -59,6 +72,9 @@ fun HomeScreen(
                     SearchBar()
                     Spacer(Modifier.height(16.dp))
                     PromoBanner()
+                    currency?.let {
+                        Text(text = "Tỷ giá USD/VND: ${it.quotes["USDVND"]}")
+                    }
                     Spacer(Modifier.height(16.dp))
                     CategoryTabs(
                         selectedCategoryId = selectedCategoryId,

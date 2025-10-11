@@ -104,6 +104,7 @@ fun ChatMessageItem(chat: ChatMessage) {
     val isMe = chat.userID == MY_USER_ID
 
     Row(
+
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
