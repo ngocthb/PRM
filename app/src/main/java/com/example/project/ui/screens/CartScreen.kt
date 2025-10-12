@@ -1,12 +1,12 @@
 package com.example.project.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
@@ -23,34 +23,19 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.project.ui.screens.components.BottomNavigationBar
 import androidx.compose.ui.platform.LocalContext
 import com.example.project.utils.NotificationUtils
-
-data class CartItem(
-    val name: String,
-    val category: String,
-    val price: Double,
-    val originalPrice: Double,
-    val imageUrl: String,
-    var quantity: Int,
-    var isSelected: Boolean = true
-)
+import com.example.project.ui.viewmodel.CartViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.project.model.CartItemDto
 
 @Composable
-fun CartScreen(navController: NavHostController) {
-    var cartItems by remember {
-        mutableStateOf(
-            listOf(
-                CartItem("Tomato", "Vegetable", 18.0, 18.0, "https://i.pravatar.cc/150?img=1", 3),
-                CartItem("Chocolate", "Bakery", 13.0, 15.0, "https://i.pravatar.cc/150?img=2", 7),
-                CartItem("Avocado", "Fruit", 7.0, 10.0, "https://i.pravatar.cc/150?img=3", 2),
-                CartItem("Milk", "Dairy", 15.0, 21.0, "https://i.pravatar.cc/150?img=4", 5)
-            )
-        )
-    }
-
-    val subtotal = cartItems.filter { it.isSelected }.sumOf { it.price * it.quantity }
-    val tax = subtotal * 0.05
-    val total = subtotal + tax
+fun CartScreen(navController: NavHostController, viewModel: CartViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val primaryColor = Color(0xFF6588E6)
+
+    LaunchedEffect(Unit) {
+        viewModel.loadCart()
+    }
 
     Scaffold(
         containerColor = Color(0xFFFAFAFA),
@@ -76,86 +61,113 @@ fun CartScreen(navController: NavHostController) {
                 )
             }
 
-            // List of cart items
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 12.dp)
-            ) {
-                itemsIndexed(cartItems) { index, item ->
-                    val context = LocalContext.current
-                    CartItemRow(
-                        item = item,
-                        onQuantityChange = { newQty ->
-                            cartItems = cartItems.toMutableList().also {
-                                it[index] = it[index].copy(quantity = newQty)
+            if (uiState.isLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = primaryColor)
+                }
+                return@Scaffold
+            }
+
+            if (uiState.items.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Your cart is empty", color = Color.Gray)
+                }
+            } else {
+                // List of cart items
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 12.dp)
+                ) {
+                    // Use the items(items = ...) overload (imported above) so compiler doesn't pick the Int overload.
+                    items(
+                        items = uiState.items,
+                        key = { it.cartItemId }
+                    ) { item ->
+                        CartItemRowNetwork(
+                            item = item,
+                            onQuantityChange = { newQty ->
+                                viewModel.updateQuantity(item.cartItemId, newQty) { success, msg ->
+                                    if (!success) Toast.makeText(context, msg ?: "Update failed", Toast.LENGTH_SHORT).show()
+                                    else {
+                                        val cartCount = viewModel.uiState.value.items.sumOf { it.quantity }
+                                        NotificationUtils.showCartBadgeNotification(context, cartCount)
+                                    }
+                                }
+                            },
+                            onRemove = {
+                                viewModel.removeItem(item.cartItemId) { success, msg ->
+                                    if (!success) Toast.makeText(context, msg ?: "Delete failed", Toast.LENGTH_SHORT).show()
+                                    else {
+                                        val cartCount = viewModel.uiState.value.items.sumOf { it.quantity }
+                                        NotificationUtils.showCartBadgeNotification(context, cartCount)
+                                    }
+                                }
                             }
-                            val cartCount = cartItems.sumOf { it.quantity }
-                            NotificationUtils.showCartBadgeNotification(context, cartCount)
-                        },
-                        onRemove = {
-                            cartItems = cartItems.toMutableList().also { it.removeAt(index) }
-                            val cartCount = cartItems.sumOf { it.quantity }
-                            NotificationUtils.showCartBadgeNotification(context, cartCount)
-                        },
-                        onSelectChange = { isSelected ->
-                            cartItems = cartItems.toMutableList().also {
-                                it[index] = it[index].copy(isSelected = isSelected)
+                        )
+                    }
+                }
+
+                // Totals
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Subtotal", color = Color.Gray)
+                        val subtotal = uiState.totalPrice // assuming API returns totalPrice as subtotal; adjust if needed
+                        Text("$${"%.2f".format(subtotal)}", fontWeight = FontWeight.Bold)
+                    }
+                    val tax = uiState.totalPrice * 0.05
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Tax (5%)", color = Color.Gray)
+                        Text("$${"%.2f".format(tax)}", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Total", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        val total = uiState.totalPrice + tax
+                        Text("$${"%.2f".format(total)}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                }
+
+                // Checkout button
+                Button(
+                    onClick = {
+                        viewModel.checkout { success, msg ->
+                            if (success) {
+                                Toast.makeText(context, "Checkout success", Toast.LENGTH_SHORT).show()
+                                NotificationUtils.showCartBadgeNotification(context, 0)
+                            } else {
+                                Toast.makeText(context, msg ?: "Checkout failed", Toast.LENGTH_SHORT).show()
                             }
-                            val cartCount = cartItems.filter { it.isSelected }.sumOf { it.quantity }
                         }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(
+                        "Checkout",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
                     )
                 }
-            }
-
-            // Totals
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-            ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Subtotal", color = Color.Gray)
-                    Text("$${"%.2f".format(subtotal)}", fontWeight = FontWeight.Bold)
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Tax (5%)", color = Color.Gray)
-                    Text("$${"%.2f".format(tax)}", fontWeight = FontWeight.Bold)
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Total", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("$${"%.2f".format(total)}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                }
-            }
-
-            // Checkout button
-            Button(
-                onClick = { /* checkout */ },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(
-                    "Checkout",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
             }
         }
     }
 }
 
 @Composable
-fun CartItemRow(
-    item: CartItem,
+fun CartItemRowNetwork(
+    item: CartItemDto,
     onQuantityChange: (Int) -> Unit,
-    onRemove: () -> Unit,
-    onSelectChange: (Boolean) -> Unit
+    onRemove: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -164,31 +176,24 @@ fun CartItemRow(
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Checkbox(
-            checked = item.isSelected,
-            onCheckedChange = { onSelectChange(it) }
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
+        // You can add checkbox/select if you need
         Image(
-            painter = rememberAsyncImagePainter(item.imageUrl),
-            contentDescription = item.name,
+            painter = rememberAsyncImagePainter("https://i.pravatar.cc/150?img=${(item.productId % 10) + 1}"),
+            contentDescription = item.productName,
             modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp))
         )
 
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(item.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(item.category, color = Color.Gray, fontSize = 13.sp)
+            Text(item.productName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("$${item.price}", fontWeight = FontWeight.Bold)
-                if (item.originalPrice > item.price) {
+                Text("$${"%.2f".format(item.price)}", fontWeight = FontWeight.Bold)
+                if (item.subTotal > item.price) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        "$${item.originalPrice}",
+                        "$${"%.2f".format(item.subTotal)}",
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
@@ -220,5 +225,3 @@ fun CartItemRow(
         )
     }
 }
-
-
