@@ -1,18 +1,16 @@
 package com.example.project.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
 import com.example.project.api.ApiServices
-import com.example.project.model.CartItemDto
-import com.example.project.model.CartResponse
-import com.example.project.model.AddCartItemRequest
-import com.example.project.model.UpdateCartItemRequest
+import com.example.project.model.*
+import com.example.project.utils.NotificationUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import me.leolin.shortcutbadger.ShortcutBadger
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -25,14 +23,15 @@ data class CartUiState(
 )
 
 class CartViewModel(application: Application) : AndroidViewModel(application) {
+    private val ctx = getApplication<Application>()
     private val _uiState = MutableStateFlow(CartUiState())
     val uiState: StateFlow<CartUiState> = _uiState.asStateFlow()
+    private val api = ApiServices.getApiService(ctx)
 
-    private val ctx = getApplication<Application>()
-
+    /** Load cart từ server */
     fun loadCart() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-        val api = ApiServices.getApiService(ctx)
+
         api.getCart().enqueue(object : Callback<CartResponse> {
             override fun onResponse(call: Call<CartResponse>, response: Response<CartResponse>) {
                 if (response.isSuccessful && response.body() != null) {
@@ -44,6 +43,7 @@ class CartViewModel(application: Application) : AndroidViewModel(application) {
                             totalPrice = body.totalPrice
                         )
                     }
+                    updateCartBadge()
                 } else {
                     val msg = try { response.errorBody()?.string() } catch (e: Exception) { null }
                     _uiState.update { it.copy(isLoading = false, errorMessage = msg ?: "Load cart failed: ${response.code()}") }
@@ -56,92 +56,123 @@ class CartViewModel(application: Application) : AndroidViewModel(application) {
         })
     }
 
-    fun updateQuantity(cartItemId: Int, newQuantity: Int, onComplete: (success: Boolean, message: String?) -> Unit) {
-        if (newQuantity < 1) { onComplete(false, "Quantity must be >= 1"); return }
+    /** Thêm sản phẩm vào cart */
+    fun addToCart(productId: Int, quantity: Int, onComplete: ((Boolean, String?) -> Unit)? = null) {
+        if (quantity < 1) {
+            onComplete?.invoke(false, "Quantity must be >= 1")
+            return
+        }
+
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-        val api = ApiServices.getApiService(ctx)
-        val req = UpdateCartItemRequest(cartItemId,newQuantity)
-        api.updateCartItem(cartItemId, req).enqueue(object : Callback<Void> {
+        val payload = AddCartItemRequest(productId, quantity)
+
+        api.addToCart(payload).enqueue(object : Callback<Void> {
             override fun onResponse(call: Call<Void>, response: Response<Void>) {
+                _uiState.update { it.copy(isLoading = false) }
                 if (response.isSuccessful) {
-                    // reload cart to get updated totals
                     loadCart()
-                    onComplete(true, null)
+                    onComplete?.invoke(true, "Added to cart successfully")
                 } else {
-                    _uiState.update { it.copy(isLoading = false) }
-                    onComplete(false, "Update failed: ${response.code()}")
+                    val msg = try { response.errorBody()?.string() } catch (e: Exception) { null }
+                    onComplete?.invoke(false, msg ?: "Add to cart failed: ${response.code()}")
                 }
             }
 
             override fun onFailure(call: Call<Void>, t: Throwable) {
                 _uiState.update { it.copy(isLoading = false) }
-                onComplete(false, "Network error: ${t.message}")
+                onComplete?.invoke(false, "Network error: ${t.message}")
             }
         })
     }
 
-    fun removeItem(cartItemId: Int, onComplete: (success: Boolean, message: String?) -> Unit) {
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-        val api = ApiServices.getApiService(ctx)
-        api.deleteCartItem(cartItemId).enqueue(object : Callback<Void> {
+    /** Tăng số lượng sản phẩm */
+    fun increaseQuantity(productId: Int) {
+        api.increaseToCart(CartRequest(productId)).enqueue(object : Callback<Void> {
             override fun onResponse(call: Call<Void>, response: Response<Void>) {
                 if (response.isSuccessful) {
-                    loadCart()
-                    onComplete(true, null)
-                } else {
-                    _uiState.update { it.copy(isLoading = false) }
-                    onComplete(false, "Delete failed: ${response.code()}")
+                    val updatedItems = _uiState.value.items.map {
+                        if (it.productId == productId) {
+                            CartItemDto(
+                                it.cartItemId,
+                                it.productId,
+                                it.productName,
+                                it.price,
+                                it.quantity + 1,
+                                it.price * (it.quantity + 1)
+                            )
+                        } else it
+                    }
+                    val total = updatedItems.sumOf { it.subTotal }
+                    _uiState.update { it.copy(items = updatedItems, totalPrice = total) }
+                    updateCartBadge()
                 }
             }
 
-            override fun onFailure(call: Call<Void>, t: Throwable) {
-                _uiState.update { it.copy(isLoading = false) }
-                onComplete(false, "Network error: ${t.message}")
-            }
+            override fun onFailure(call: Call<Void>, t: Throwable) {}
         })
     }
 
-    fun addItem(productId: Int, quantity: Int, onComplete: (success: Boolean, message: String?) -> Unit) {
-        val api = ApiServices.getApiService(ctx)
-        val req = AddCartItemRequest(productId, quantity)
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-        api.addCartItem(req).enqueue(object : Callback<Void> {
+    /** Giảm số lượng sản phẩm */
+    fun decreaseQuantity(productId: Int) {
+        val item = _uiState.value.items.find { it.productId == productId } ?: return
+
+        if (item.quantity <= 1) {
+            removeFromCart(productId)
+            return
+        }
+
+        api.decreaseToCart(CartRequest(productId)).enqueue(object : Callback<Void> {
             override fun onResponse(call: Call<Void>, response: Response<Void>) {
                 if (response.isSuccessful) {
-                    loadCart()
-                    onComplete(true, null)
-                } else {
-                    _uiState.update { it.copy(isLoading = false) }
-                    onComplete(false, "Add failed: ${response.code()}")
+                    val updatedItems = _uiState.value.items.map {
+                        if (it.productId == productId) {
+                            CartItemDto(
+                                it.cartItemId,
+                                it.productId,
+                                it.productName,
+                                it.price,
+                                it.quantity - 1,
+                                it.price * (it.quantity - 1)
+                            )
+                        } else it
+                    }
+                    val total = updatedItems.sumOf { it.subTotal }
+                    _uiState.update { it.copy(items = updatedItems, totalPrice = total) }
+                    updateCartBadge()
                 }
             }
 
-            override fun onFailure(call: Call<Void>, t: Throwable) {
-                _uiState.update { it.copy(isLoading = false) }
-                onComplete(false, "Network error: ${t.message}")
-            }
+            override fun onFailure(call: Call<Void>, t: Throwable) {}
         })
     }
 
-    fun checkout(onComplete: (success: Boolean, message: String?) -> Unit) {
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-        val api = ApiServices.getApiService(ctx)
-        api.checkoutCart().enqueue(object : Callback<Void> {
+    /** Xóa sản phẩm khỏi cart */
+    fun removeFromCart(productId: Int) {
+        api.removeToCart(CartRequest(productId)).enqueue(object : Callback<Void> {
             override fun onResponse(call: Call<Void>, response: Response<Void>) {
                 if (response.isSuccessful) {
-                    // after checkout, reload cart (should be empty or new cart)
-                    loadCart()
-                    onComplete(true, null)
-                } else {
-                    _uiState.update { it.copy(isLoading = false) }
-                    onComplete(false, "Checkout failed: ${response.code()}")
+                    val updatedItems = _uiState.value.items.filter { it.productId != productId }
+                    val total = updatedItems.sumOf { it.subTotal }
+                    _uiState.update { it.copy(items = updatedItems, totalPrice = total) }
+                    updateCartBadge()
                 }
             }
 
-            override fun onFailure(call: Call<Void>, t: Throwable) {
-                _uiState.update { it.copy(isLoading = false) }
-                onComplete(false, "Network error: ${t.message}")
-            }
+            override fun onFailure(call: Call<Void>, t: Throwable) {}
         })
     }
+
+    /** Cập nhật badge số lượng cart trên icon app */
+    private fun updateCartBadge() {
+        val count = _uiState.value.items.sumOf { it.quantity }
+
+        if (count > 0) {
+            NotificationUtils.showCartBadgeNotification(ctx, count)
+        } else {
+            ShortcutBadger.removeCount(ctx)
+        }
+    }
+
+
+
 }

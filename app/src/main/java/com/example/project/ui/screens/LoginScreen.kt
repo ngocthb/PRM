@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -28,7 +29,7 @@ fun LoginScreen(
     onRegisterClick: () -> Unit,
     snackbarHostState: SnackbarHostState,
     scope: CoroutineScope,
-    viewModel: LoginViewModel = viewModel()
+    viewModel: LoginViewModel,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -131,6 +132,8 @@ fun LoginTextField(
             unfocusedContainerColor = Color.White,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent
-        )
+        ),
+                textStyle = TextStyle(color = Color.Black),
+
     )
 }

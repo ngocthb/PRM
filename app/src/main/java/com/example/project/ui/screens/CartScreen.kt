@@ -22,15 +22,17 @@ import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
 import com.example.project.ui.screens.components.BottomNavigationBar
 import androidx.compose.ui.platform.LocalContext
-import com.example.project.utils.NotificationUtils
+
 import com.example.project.ui.viewmodel.CartViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.project.model.CartItemDto
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
 fun CartScreen(navController: NavHostController, viewModel: CartViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+
     val primaryColor = Color(0xFF6588E6)
 
     LaunchedEffect(Unit) {
@@ -86,25 +88,9 @@ fun CartScreen(navController: NavHostController, viewModel: CartViewModel = view
                     ) { item ->
                         CartItemRowNetwork(
                             item = item,
-                            onQuantityChange = { newQty ->
-                                viewModel.updateQuantity(item.cartItemId, newQty) { success, msg ->
-                                    if (!success) Toast.makeText(context, msg ?: "Update failed", Toast.LENGTH_SHORT).show()
-                                    else {
-                                        val cartCount = viewModel.uiState.value.items.sumOf { it.quantity }
-                                        NotificationUtils.showCartBadgeNotification(context, cartCount)
-                                    }
-                                }
-                            },
-                            onRemove = {
-                                viewModel.removeItem(item.cartItemId) { success, msg ->
-                                    if (!success) Toast.makeText(context, msg ?: "Delete failed", Toast.LENGTH_SHORT).show()
-                                    else {
-                                        val cartCount = viewModel.uiState.value.items.sumOf { it.quantity }
-                                        NotificationUtils.showCartBadgeNotification(context, cartCount)
-                                    }
-                                }
-                            }
+                            viewModel = viewModel
                         )
+
                     }
                 }
 
@@ -117,32 +103,25 @@ fun CartScreen(navController: NavHostController, viewModel: CartViewModel = view
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Subtotal", color = Color.Gray)
                         val subtotal = uiState.totalPrice // assuming API returns totalPrice as subtotal; adjust if needed
-                        Text("$${"%.2f".format(subtotal)}", fontWeight = FontWeight.Bold)
+                        Text("${NumberFormat.getNumberInstance(Locale.US).format(subtotal)}",color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                     val tax = uiState.totalPrice * 0.05
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Tax (5%)", color = Color.Gray)
-                        Text("$${"%.2f".format(tax)}", fontWeight = FontWeight.Bold)
+                        Text("${NumberFormat.getNumberInstance(Locale.US).format(tax)}",color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Total", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("Total", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
                         val total = uiState.totalPrice + tax
-                        Text("$${"%.2f".format(total)}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("${NumberFormat.getNumberInstance(Locale.US).format(total)}",color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     }
                 }
 
                 // Checkout button
                 Button(
                     onClick = {
-                        viewModel.checkout { success, msg ->
-                            if (success) {
-                                Toast.makeText(context, "Checkout success", Toast.LENGTH_SHORT).show()
-                                NotificationUtils.showCartBadgeNotification(context, 0)
-                            } else {
-                                Toast.makeText(context, msg ?: "Checkout failed", Toast.LENGTH_SHORT).show()
-                            }
-                        }
+
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -166,9 +145,11 @@ fun CartScreen(navController: NavHostController, viewModel: CartViewModel = view
 @Composable
 fun CartItemRowNetwork(
     item: CartItemDto,
-    onQuantityChange: (Int) -> Unit,
-    onRemove: () -> Unit
+    viewModel: CartViewModel
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -176,52 +157,49 @@ fun CartItemRowNetwork(
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // You can add checkbox/select if you need
-        Image(
-            painter = rememberAsyncImagePainter("https://i.pravatar.cc/150?img=${(item.productId % 10) + 1}"),
-            contentDescription = item.productName,
-            modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp))
-        )
+
 
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(item.productName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(item.productName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
             Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("$${"%.2f".format(item.price)}", fontWeight = FontWeight.Bold)
-                if (item.subTotal > item.price) {
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        "$${"%.2f".format(item.subTotal)}",
-                        color = Color.Gray,
-                        fontSize = 12.sp
-                    )
-                }
-            }
+            Text("${NumberFormat.getNumberInstance(Locale.US).format(item.price)}", fontWeight = FontWeight.Bold , color = Color.Gray)
         }
 
         Spacer(modifier = Modifier.width(12.dp))
 
+        // Quantity controls
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("-", modifier = Modifier
-                .clickable { if (item.quantity > 1) onQuantityChange(item.quantity - 1) }
-                .padding(horizontal = 6.dp, vertical = 4.dp))
-            Text(item.quantity.toString(), modifier = Modifier.padding(horizontal = 4.dp))
-            Text("+", modifier = Modifier
-                .clickable { onQuantityChange(item.quantity + 1) }
-                .padding(horizontal = 6.dp, vertical = 4.dp))
+            // Decrease
+            Text("-", color = Color.Black , modifier = Modifier
+                .clickable {
+                    if (item.quantity > 1) {
+                        viewModel.decreaseQuantity(item.productId)
+                    } else {
+                        viewModel.removeFromCart(item.productId)
+                    }
+                }
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+            )
+            Text(item.quantity.toString(),color = Color.Black, modifier = Modifier.padding(horizontal = 4.dp))
+            // Increase
+            Text("+",color = Color.Black, modifier = Modifier
+                .clickable { viewModel.increaseQuantity(item.productId) }
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+            )
         }
 
         Spacer(modifier = Modifier.width(12.dp))
 
+        // Remove button
         Icon(
             imageVector = Icons.Default.Delete,
             contentDescription = "Remove item",
             tint = Color.Red,
             modifier = Modifier
                 .size(28.dp)
-                .clickable { onRemove() }
+                .clickable { viewModel.removeFromCart(item.productId) }
         )
     }
 }

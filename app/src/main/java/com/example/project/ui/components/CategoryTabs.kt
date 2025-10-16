@@ -1,3 +1,4 @@
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,7 +18,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.Checkroom
+import androidx.compose.material.icons.outlined.DirectionsRun
+import androidx.compose.material.icons.outlined.DryCleaning
+import androidx.compose.material.icons.outlined.Face
+import androidx.compose.material.icons.outlined.FaceRetouchingNatural
+import androidx.compose.material.icons.outlined.ShoppingBag
+import com.example.project.model.CategoryResponse
 
 data class CategoryItem(
     val id: Int,
@@ -27,24 +35,25 @@ data class CategoryItem(
 
 @Composable
 fun CategoryTabs(
+    categories: List<CategoryResponse>,
     selectedCategoryId: Int?,
-    onCategoryClick: (Int) -> Unit = {}
+    onCategoryClick: (Int) -> Unit
 ) {
-    val categories = listOf(
-        CategoryItem(1, "Clothes", Icons.Outlined.Checkroom),
-        CategoryItem(2, "Electronics", Icons.Outlined.PhoneIphone),
-        CategoryItem(3, "Shoes", Icons.Outlined.DirectionsRun),
-        CategoryItem(4, "Watch", Icons.Outlined.Watch),
-        CategoryItem(5, "Bag", Icons.Outlined.ShoppingBag),
-        CategoryItem(6, "Jewelry", Icons.Outlined.Diamond),
-        CategoryItem(7, "Cosmetics", Icons.Outlined.Face),
-        CategoryItem(8, "Sports", Icons.Outlined.SportsSoccer)
-    )
+
+
+    val iconForCategory: (Int) -> ImageVector = { id ->
+        when (id) {
+            2 -> Icons.Outlined.Checkroom    // Áo
+            3 -> Icons.Outlined.DryCleaning  // Quần
+            4 -> Icons.Outlined.DirectionsRun // Giày
+            5 -> Icons.Outlined.FaceRetouchingNatural // Váy
+            else -> Icons.Outlined.Category
+        }
+    }
 
     var showAll by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -52,7 +61,7 @@ fun CategoryTabs(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Category", style = MaterialTheme.typography.titleMedium)
+            Text("Category", style = MaterialTheme.typography.titleMedium , color = Color.Black)
             Text(
                 if (showAll) "Hide" else "See All",
                 color = Color(0xFF6588E6),
@@ -62,42 +71,29 @@ fun CategoryTabs(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (showAll) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 400.dp)
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
-            ) {
-                items(categories.size) { index ->
-                    val category = categories[index]
-                    CategoryItemView(
-                        category = category,
-                        isSelected = category.id == selectedCategoryId,
-                        onClick = { onCategoryClick(category.id) }
-                    )
-                }
-            }
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                categories.take(4).forEach { category ->
-                    CategoryItemView(
-                        category = category,
-                        isSelected = category.id == selectedCategoryId,
-                        onClick = { onCategoryClick(category.id) }
-                    )
-                }
+        val visibleCategories = if (showAll) categories else categories.take(4)
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            visibleCategories.forEach { category ->
+                CategoryItemView(
+                    category = CategoryItem(
+                        id = category.categoryId,
+                        name = category.categoryName,
+                        icon = iconForCategory(category.categoryId)
+                    ),
+                    isSelected = category.categoryId == selectedCategoryId,
+                    onClick = { onCategoryClick(category.categoryId) }
+                )
             }
         }
     }
 }
+
 
 @Composable
 private fun CategoryItemView(

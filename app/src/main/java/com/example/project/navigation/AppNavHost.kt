@@ -15,12 +15,13 @@ import com.example.project.ui.components.CustomSnackbarHost
 import com.example.project.ui.screens.*
 import com.example.project.ui.screens.ChatListScreen
 import com.example.project.ui.screens.ShopMapScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.project.ui.viewmodel.LoginViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavHost(navController: NavHostController = rememberNavController()) {
-
-    // 🔥 Snackbar toàn cục
+    val loginViewModel: LoginViewModel = viewModel()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val layoutDirection = LocalLayoutDirection.current
@@ -51,6 +52,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             // LoginScreen
             composable(Destinations.Login) {
                 LoginScreen(
+                    viewModel = loginViewModel,
                     onLoginSuccess = {
                         navController.navigate(Destinations.Home) {
                             popUpTo(Destinations.Login) { inclusive = true }
@@ -80,11 +82,13 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
 
             // Home
             composable(Destinations.Home) {
+
                 HomeScreen(
                     onProductClick = { product ->
-                        navController.navigate("${Destinations.ProductDetail}/${product.ProductID}")
+                        navController.navigate("${Destinations.ProductDetail}/${product.productId}")
                     },
-                    navController = navController
+                    navController = navController,
+                    viewModel = loginViewModel
                 )
             }
 
@@ -98,7 +102,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                     ProductDetail(
                         productId = productId,
                         navController = navController,
-                        onAddToCart = { /* handle add to cart */ }
+                        snackbarHostState = snackbarHostState,
                     )
                 } else {
                     Box(

@@ -12,9 +12,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mapbox.maps.extension.style.expressions.dsl.generated.color
 
 @Composable
-fun TopBar() {
+fun TopBar(
+    username: String?,
+    address: String?
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -23,9 +27,17 @@ fun TopBar() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
-            Text("Hello, Zvezda", fontSize = 14.sp, color = Color.Gray)
-            Text("Jakarta, INA", fontWeight = FontWeight.Bold)
+            Text(
+                text = "Hello, ${username ?: "Guest"}",
+                fontSize = 14.sp,
+                color = Color.Gray
+            )
+            Text(
+                text = address ?: "No address",
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
         }
-        Icon(imageVector = Icons.Default.Person, contentDescription = "Profile")
+        Icon(imageVector = Icons.Default.Person, contentDescription = "Profile", tint = Color.Black )
     }
 }

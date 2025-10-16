@@ -32,110 +32,115 @@ import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.project.R // Assuming you have R.drawable.placeholder_image etc.
 import com.example.project.model.Product
+import com.example.project.model.ProductDetailResponse
+import com.example.project.ui.viewmodel.CartViewModel
+import com.example.project.ui.viewmodel.ProductViewModel
+import kotlinx.coroutines.launch
+import java.text.NumberFormat
+import java.util.Locale
 
 
 val AccentBlue = Color(0xFF6588E6)
 val SubtleGray = Color(0xFF888888)
 val LightSurface = Color(0xFFF5F5F5)
-
 @OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun ProductDetail(
     productId: Int,
     navController: NavController,
-    onAddToCart: () -> Unit = {}
+    snackbarHostState: SnackbarHostState,
+    cartViewModel: CartViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    viewModel: ProductViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
+    val detailState by viewModel.detailState.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Khi screen khởi tạo, gọi API lấy product detail
     LaunchedEffect(productId) {
-        Log.d("ProductDetailScreen", "Received productId: $productId")
+        viewModel.getProductDetail(productId)
     }
 
-    val product = remember(productId) {
-        Product(
-            ProductID = productId,
-            ProductName = "Pink Blazer",
-            Price = 250.0,
-            ImageURL = "https://th.bing.com/th?id=OIF.%2bBYOth1qtrGy4epcdX%2bWIw&rs=1&pid=ImgDetMain&o=7&rm=3",
-            CategoryID = "Clothes",
-            BriefDescription = "Pink blazer with soft material, not hot comfortable laying, available in various sizes. Suitable for use at parties.",
-            FullDescription = "Comfortable cotton casual t-shirt with V-neck style.",
-            TechnicalSpecifications = "Material: Cotton, Sizes: S/M/L/XL"
-        )
+    val product = detailState.product
+    if (product == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
     }
 
     var quantity by remember { mutableStateOf(1) }
+
+    val onAddToCart = {
+        cartViewModel.addToCart(product.productId, quantity) { success, message ->
+            scope.launch {
+                message?.let {
+                    snackbarHostState.showSnackbar(
+                        message = it,
+                        actionLabel = if (success) "SUCCESS" else "ERROR"
+                    )
+                }
+            }
+        }
+    }
+
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
-    Scaffold(
-        containerColor = Color(0xFFFAFAFA),
-    ) { paddingValues ->
+    Scaffold(containerColor = Color(0xFFFAFAFA)) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding( bottom = paddingValues.calculateBottomPadding()) // Apply only bottom padding from scaffold if needed
-            // horizontal and top padding will be handled differently
+                .padding(bottom = paddingValues.calculateBottomPadding())
         ) {
-            // Box for Image and Back Button Overlay
+            // --- UI vẫn nguyên như trước ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(screenHeight * 1 / 2) // Image height 2/3 of device height
+                    .height(screenHeight * 1 / 2)
             ) {
                 Image(
-                    painter = rememberAsyncImagePainter(
-                        model = product.ImageURL,
-                        // placeholder = painterResource(id = R.drawable.placeholder_image),
-                        // error = painterResource(id = R.drawable.error_image)
-                    ),
-                    contentDescription = product.ProductName,
+                    painter = rememberAsyncImagePainter(model = product.imageUrl),
+                    contentDescription = product.productName,
                     modifier = Modifier
-                        .fillMaxSize() // Image fills the Box
-                        .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)), // Optional: Clip bottom corners
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)),
                     contentScale = ContentScale.Crop
                 )
 
-                // Back Button
                 IconButton(
                     onClick = { navController.popBackStack() },
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(start = 16.dp, top = 32.dp) // tăng top để nút xuống thấp hơn
-                        .background(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                            CircleShape
-                        )
+                        .padding(start = 16.dp, top = 32.dp)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f), CircleShape)
                         .size(40.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                 }
-
             }
 
-            // Content below the image
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp) // Padding for the content area
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Name and Price
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = product.ProductName,
+                        text = product.productName,
                         style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
                     )
                     Text(
-                        text = "$${product.Price}",
+                        text = "${NumberFormat.getNumberInstance(Locale.US).format(product.price)}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFE91E36)
@@ -143,64 +148,38 @@ fun ProductDetail(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-
-                // Description
-                Text(
-                    text = product.BriefDescription,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = SubtleGray
-                )
-
+                Text(product.briefDescription, style = MaterialTheme.typography.bodyMedium, color = SubtleGray)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(product.fullDescription, style = MaterialTheme.typography.bodyMedium, color = SubtleGray)
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Quantity Selector
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        "Quantity:",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Text("Quantity:", style = MaterialTheme.typography.titleMedium, color = Color.Black)
                     Spacer(modifier = Modifier.weight(1f))
-                    IconButton(
-                        onClick = { if (quantity > 1) quantity-- },
-                        modifier = Modifier.size(40.dp)
-                    ) { Icon(Icons.Default.Delete, "Decrease quantity") }
-
-                    Text(
-                        text = quantity.toString(),
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(
-                        onClick = { quantity++ },
-                        modifier = Modifier.size(40.dp)
-                    ) { Icon(Icons.Default.Add, "Increase quantity") }
+                    IconButton(onClick = { if (quantity > 1) quantity-- }, modifier = Modifier.size(40.dp)) {
+                      Text("-",  color = Color.Black)
+                    }
+                    Text(quantity.toString(), modifier = Modifier.padding(horizontal = 16.dp), fontWeight = FontWeight.Bold, color = Color.Black)
+                    IconButton(onClick = { quantity++ }, modifier = Modifier.size(40.dp)) {
+                        Text("+",  color = Color.Black)
+                    }
                 }
 
-                Spacer(modifier = Modifier.weight(1f)) // Push buttons to bottom
+                Spacer(modifier = Modifier.weight(1f))
 
-                // Action Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
                         onClick = onAddToCart,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp),
+                        modifier = Modifier.weight(1f).height(56.dp),
                         colors = ButtonDefaults.buttonColors(Color(0xFF6588E6)),
                         shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Text(
-                            text = "Buy Now",
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
+                    ) { Text("Buy Now", color = Color.White, style = MaterialTheme.typography.titleMedium) }
 
                     Spacer(modifier = Modifier.width(16.dp))
 
@@ -208,19 +187,14 @@ fun ProductDetail(
                         onClick = onAddToCart,
                         modifier = Modifier.size(56.dp),
                         shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(1.dp,Color(0xFF6588E6)),
+                        border = BorderStroke(1.dp, Color(0xFF6588E6)),
                         contentPadding = PaddingValues(0.dp)
-
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ShoppingCart,
-                            contentDescription = "Add to Cart",
-                            tint = AccentBlue,
-                            modifier = Modifier.size(32.dp)
-                        )
+                        Icon(Icons.Default.ShoppingCart, contentDescription = "Add to Cart", tint = AccentBlue, modifier = Modifier.size(32.dp))
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp)) // Add some bottom padding
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

@@ -2,6 +2,8 @@ package com.example.project.api;
 
 import com.example.project.model.*;
 
+import java.util.List;
+
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.DELETE;
@@ -17,20 +19,42 @@ public interface ApiInterface {
     @POST("Auth/login")
     Call<LoginResponse> loginUser(@Body LoginRequest request);
 
+    @GET("User/{id}")
+    Call<UserResponse> getUserById(
+            @Path("id") int id
+
+    );
+
+    @GET("product/{id}")
+   Call<ProductDetailResponse> getProductById(
+           @Path("id") int id
+    );
+
+
+
+    @GET("Product/all")
+    Call<List<ProductResponse>> getProducts();
+
+    @GET("Category/all")
+    Call<List<CategoryResponse>> getCategories();
+
+
     @GET("Cart")
     Call<CartResponse> getCart(); // GET /api/Cart
 
 
-    // đoạn này chưa làm
-    @POST("Cart/items")
-    Call<Void> addCartItem(@Body AddCartItemRequest request); // POST /api/Cart/items
+    @POST("Cart/add")
+    Call<Void> addToCart(@Body AddCartItemRequest request); // POST /api/Cart/items
 
-    @PUT("Cart/items/{cartItemId}")
-    Call<Void> updateCartItem(@Path("cartItemId") int cartItemId, @Body UpdateCartItemRequest request); // PUT /api/Cart/items/{cartItemId}
 
-    @DELETE("Cart/items/{cartItemId}")
-    Call<Void> deleteCartItem(@Path("cartItemId") int cartItemId); // DELETE /api/Cart/items/{cartItemId}
+    @POST("Cart/increase")
+    Call<Void> increaseToCart (@Body CartRequest request);
 
-    @POST("Cart/checkout")
-    Call<Void> checkoutCart(); // POST /api/Cart/checkout
+    @POST("Cart/decrease")
+    Call<Void> decreaseToCart (@Body CartRequest request);
+
+    @POST("Cart/remove")
+    Call<Void> removeToCart (@Body CartRequest request);
+
+
 }

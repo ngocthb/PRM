@@ -6,6 +6,7 @@ import com.example.project.api.ApiServices
 import com.example.project.api.TokenManager
 import com.example.project.model.LoginRequest
 import com.example.project.model.LoginResponse
+import com.example.project.model.UserResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +21,9 @@ data class LoginUiState(
     val password: String = "",
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val loginSuccess: Boolean = false
+    val loginSuccess: Boolean = false,
+    val token: String? = null,
+    val user: UserResponse? = null
 )
 
 class LoginViewModel(application: Application) : AndroidViewModel(application) {
@@ -29,6 +32,22 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
     private val ctx = getApplication<Application>()
+    private val tokenManager = TokenManager.getInstance(ctx)
+
+    init {
+        // Kiểm tra token còn hạn hay không
+        val savedToken = tokenManager.getToken()
+        val savedUserId = tokenManager.getUserId()
+        if (!savedToken.isNullOrEmpty() && savedUserId != -1L) {
+            // token còn hạn -> tự động fetch user info
+            _uiState.update { it.copy(token = savedToken) }
+            fetchUserInfo(savedUserId.toInt())
+        } else {
+            // token hết hạn hoặc không có -> clear và reset state
+            tokenManager.clear()
+            _uiState.update { it.copy(token = null, loginSuccess = false) }
+        }
+    }
 
     fun onEmailChange(new: String) {
         _uiState.update { it.copy(email = new, errorMessage = null) }
@@ -49,6 +68,7 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     fun login() {
         val current = _uiState.value
         if (current.isLoading) return
+
         if (current.email.isBlank() || current.password.isBlank()) {
             _uiState.update { it.copy(errorMessage = "Please fill all required fields!") }
             return
@@ -57,43 +77,39 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
         val request = LoginRequest(current.email, current.password)
-        val api = ApiServices.getApiService(ctx) // đảm bảo ApiServices signature nhận Context
+        val api = ApiServices.getApiService(ctx)
 
         api.loginUser(request).enqueue(object : Callback<LoginResponse> {
             override fun onResponse(call: Call<LoginResponse>, response: Response<LoginResponse>) {
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
                     val token = body.token
-                    val userIdLong = body.userId // đã Long theo model
+                    val userIdLong = body.userId
 
                     if (token.isNotEmpty()) {
-                        // Lưu token + userId
-                        TokenManager.getInstance(ctx).saveTokenAndUserId(token, userIdLong.toLong())
-                        _uiState.update { it.copy(isLoading = false, loginSuccess = true) }
+                        // Lưu token + userId + thời gian hết hạn 3h
+                        tokenManager.saveTokenAndUserId(token, userIdLong.toLong())
+
+                        // Fetch thông tin user
+                        fetchUserInfo(userIdLong)
                     } else {
                         _uiState.update { it.copy(isLoading = false, errorMessage = "Server didn't return token") }
                     }
                 } else {
-                    // đọc thô (chỉ đọc được 1 lần)
                     val raw = try { response.errorBody()?.string() } catch (e: Exception) { null }
-
-                    // parse JSON nhẹ bằng JSONObject, lấy "message" hoặc fallback về raw hoặc thông báo mặc định
                     val parsedMessage = raw?.let {
                         try {
                             val jo = JSONObject(it)
-                            // thử các key hay dùng
                             when {
                                 jo.has("message") -> jo.getString("message")
                                 jo.has("error") -> jo.getString("error")
-                                else -> it // fallback: show raw body
+                                else -> it
                             }
                         } catch (e: Exception) {
-                            // không phải JSON -> show nguyên chuỗi
                             it
                         }
                     } ?: "Login failed: ${response.code()}"
 
-                    // cập nhật state để UI hiển thị (snackbar sẽ lấy uiState.errorMessage)
                     _uiState.update { it.copy(isLoading = false, errorMessage = parsedMessage) }
                 }
             }
@@ -102,5 +118,47 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update { it.copy(isLoading = false, errorMessage = "Network error: ${t.message}") }
             }
         })
+    }
+
+    private fun fetchUserInfo(userId: Int) {
+        val api = ApiServices.getApiService(ctx)
+        api.getUserById(userId).enqueue(object : Callback<UserResponse> {
+            override fun onResponse(call: Call<UserResponse>, response: Response<UserResponse>) {
+                if (response.isSuccessful && response.body() != null) {
+                    val user = response.body()!!
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            loginSuccess = true,
+                            user = user
+                        )
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Failed to load user info"
+                        )
+                    }
+                }
+            }
+
+            override fun onFailure(call: Call<UserResponse>, t: Throwable) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Network error: ${t.message}"
+                    )
+                }
+            }
+        })
+    }
+
+    // Hàm tiện ích: kiểm tra token còn hợp lệ, logout nếu hết hạn
+    fun checkTokenValidity() {
+        if (!tokenManager.isTokenValid()) {
+            tokenManager.clear()
+            _uiState.update { it.copy(token = null, loginSuccess = false, user = null) }
+        }
     }
 }

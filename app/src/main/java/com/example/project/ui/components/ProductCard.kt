@@ -15,12 +15,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.project.model.Product
+import com.example.project.model.ProductResponse
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
 fun ProductCard(
-    product: Product,
-    onProductClick: (Product) -> Unit,
+    product: ProductResponse,
+    onProductClick: (ProductResponse) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -32,8 +34,8 @@ fun ProductCard(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             // Ảnh sản phẩm
             AsyncImage(
-                model = product.ImageURL,
-                contentDescription = product.ProductName,
+                model = product.imageUrl,
+                contentDescription = product.productName,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(140.dp),
@@ -49,14 +51,14 @@ fun ProductCard(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = product.ProductName,
+                    text = product.productName,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     fontSize = 16.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "$${product.Price}",
+                    text = "${NumberFormat.getNumberInstance(Locale.US).format(product.price)}đ",
                     color = Color.White,
                     fontSize = 14.sp
                 )
