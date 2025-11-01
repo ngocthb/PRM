@@ -170,8 +170,9 @@ fun ShopMapScreen(onBack: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 24.dp)
+                .padding(horizontal = 30.dp, vertical = 24.dp)
                 .align(Alignment.BottomCenter)
+                .offset(y = (-60).dp)
         ) {
             androidx.compose.material.Button(
                 onClick = { showRoute = true },
@@ -189,6 +190,7 @@ fun ShopMapScreen(onBack: () -> Unit) {
                 )
             }
         }
+
 
     }
 }

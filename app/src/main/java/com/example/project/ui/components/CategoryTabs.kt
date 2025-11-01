@@ -43,10 +43,10 @@ fun CategoryTabs(
 
     val iconForCategory: (Int) -> ImageVector = { id ->
         when (id) {
-            2 -> Icons.Outlined.Checkroom    // Áo
-            3 -> Icons.Outlined.DryCleaning  // Quần
-            4 -> Icons.Outlined.DirectionsRun // Giày
-            5 -> Icons.Outlined.FaceRetouchingNatural // Váy
+            1 -> Icons.Outlined.Checkroom    // Áo
+            2 -> Icons.Outlined.DryCleaning  // Quần
+            3 -> Icons.Outlined.DirectionsRun // Giày
+            4 -> Icons.Outlined.FaceRetouchingNatural // Váy
             else -> Icons.Outlined.Category
         }
     }
