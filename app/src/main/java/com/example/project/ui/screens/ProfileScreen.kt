@@ -25,7 +25,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.navigation.NavHostController
 import com.example.project.ui.screens.components.BottomNavigationBar
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.project.api.TokenManager
+import com.example.project.ui.viewmodel.LoginViewModel
 
 data class ProfileOption(
     val title: String,
@@ -34,28 +37,23 @@ data class ProfileOption(
     val onClick: () -> Unit
 )
 
-/**
- * Thay đổi: thêm parameter onLogout: () -> Unit
- * - ProfileScreen sẽ xóa token (TokenManager) và gọi onLogout() khi user xác nhận logout.
- */
+
 @Composable
 fun ProfileScreen(
     navController: NavHostController,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    loginViewModel: LoginViewModel = viewModel()
 ) {
     val context = LocalContext.current
     var showLogoutDialog by remember { mutableStateOf(false) }
 
-    // Build options; logout uses a confirmation dialog
+    val loginUiState by loginViewModel.uiState.collectAsState()
     val options = listOf(
-        ProfileOption("Edit Profile", Icons.Outlined.Person, Color(0xFF4CAF50)) { /* TODO */ },
-//        ProfileOption("Shopping Address", Icons.Outlined.LocationOn, Color(0xFFFF9800)) { /* TODO */ },
-        ProfileOption("Shopping Address", Icons.Outlined.LocationOn, Color(0xFFFF9800)) {
-            navController.navigate(Destinations.ShopMap)
+        ProfileOption("Profile", Icons.Outlined.Person, Color(0xFF4CAF50)) {
+            navController.navigate("user")
         },
-        ProfileOption("Wishlist", Icons.Outlined.Favorite, Color(0xFFF44336)) { /* TODO */ },
-        ProfileOption("Order History", Icons.Outlined.List, Color(0xFF2196F3)) { /* TODO */ },
-        ProfileOption("Notification", Icons.Outlined.Notifications, Color(0xFFFFC107)) { /* TODO */ },
+
+        ProfileOption("Order History", Icons.Outlined.List, Color(0xFF2196F3)) {navController.navigate("history") },
         ProfileOption("Log Out", Icons.Outlined.Logout, Color(0xFFF44336)) {
             showLogoutDialog = true
         }
@@ -106,7 +104,9 @@ fun ProfileScreen(
                 .fillMaxSize()
         ) {
 
-            // Avatar + Name + Status with white background
+            val user = loginUiState.user?.username ?: "Guest"
+            val firstLetter = user.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -131,34 +131,31 @@ fun ProfileScreen(
                         }
                     }
 
+
                     // Avatar image
-                    Image(
-                        painter = rememberAsyncImagePainter("https://i.pravatar.cc/150?img=5"),
-                        contentDescription = "Profile Image",
+                    Box(
                         modifier = Modifier
                             .size(100.dp)
                             .clip(CircleShape)
-                            .shadow(4.dp, CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
+                            .background(Color(0xFF6588E6)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = firstLetter,
+                            color = Color.White,
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Name and status
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Darlene Robertson", fontSize = 20.sp, color = Color.Black)
+                    Text(user, fontSize = 20.sp, color = Color.Black)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(Color.Green)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Active status", fontSize = 14.sp, color = Color.Gray)
-                    }
+
                 }
                 Spacer(modifier = Modifier.height(32.dp))
             }

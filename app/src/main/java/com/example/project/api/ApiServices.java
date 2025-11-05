@@ -8,9 +8,9 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 public class ApiServices {
 //    private static final String BASE_URL = "http://10.0.2.2:8080/api/";
-
+    private static final String BASE_URL = "http://192.168.1.16:8080/api/";
 //    private static final String BASE_URL = "http://192.168.2.181:8080/api/";
-private static final String BASE_URL = "http://10.0.2.2:8080/api/";
+//private static final String BASE_URL = "http://10.0.2.2:8080/api/";
     private static ApiInterface apiInterface;
 
     // Lưu ý: phải truyền Context để interceptor có thể đọc token

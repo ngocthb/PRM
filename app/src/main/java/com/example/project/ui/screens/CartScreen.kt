@@ -23,20 +23,24 @@ import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
 import com.example.project.ui.screens.components.BottomNavigationBar
 import androidx.compose.ui.platform.LocalContext
-
 import com.example.project.ui.viewmodel.CartViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.project.api.ApiServices
 import com.example.project.api.TokenManager
 import com.example.project.model.CartItemDto
+import com.example.project.model.CreateOrderRequest
 import com.example.project.model.OrderRequest
+import com.example.project.ui.components.SnackbarType
+import com.example.project.ui.viewmodel.LoginViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
 @Composable
-fun CartScreen(navController: NavHostController, viewModel: CartViewModel = viewModel()) {
+fun CartScreen(navController: NavHostController, viewModel: CartViewModel = viewModel(), loginViewModel: LoginViewModel = viewModel(), scope: CoroutineScope, snackbarHostState: SnackbarHostState,) {
     val uiState by viewModel.uiState.collectAsState()
-
+    val loginUiState by loginViewModel.uiState.collectAsState()
     val primaryColor = Color(0xFF6588E6)
 
     LaunchedEffect(Unit) {
@@ -104,20 +108,11 @@ fun CartScreen(navController: NavHostController, viewModel: CartViewModel = view
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
                 ) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Subtotal", color = Color.Gray)
-                        val subtotal = uiState.totalPrice // assuming API returns totalPrice as subtotal; adjust if needed
-                        Text("${NumberFormat.getNumberInstance(Locale.US).format(subtotal)}",color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                    val tax = uiState.totalPrice * 0.05
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Tax (5%)", color = Color.Gray)
-                        Text("${NumberFormat.getNumberInstance(Locale.US).format(tax)}",color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Total", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
-                        val total = uiState.totalPrice + tax
+                        val total = uiState.totalPrice
                         Text("${NumberFormat.getNumberInstance(Locale.US).format(total)}",color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     }
                 }
@@ -126,22 +121,34 @@ fun CartScreen(navController: NavHostController, viewModel: CartViewModel = view
                 val context = LocalContext.current
                 val tokenManager = TokenManager.getInstance(context)
                 val userId = tokenManager.getUserId().toInt()
+                val user = loginUiState.user
+                val payload = CreateOrderRequest(
+                    userId,
+                    "PayOS",
+                    user?.address ?: ""
+                )
 
                 Button(
                     onClick = {
-                        viewModel.createOrder(
-                            userId = userId,
-                            paymentMethod = "PayOS",
-                            address = "123 ABC Street"
-                        ) { success, message ->
-                            if (success) {
-                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                                navController.navigate("order")
-                            } else {
-                                Toast.makeText(context, message ?: "Unknown error", Toast.LENGTH_SHORT).show()
+                        user?.address?.let {
+                            viewModel.createOrder(
+                                payload
+                            ) { success, message, orderId  ->
+                                println("✅ createOrder callback: success=$success, message=$message, orderId=$orderId")
+
+                                if (success && orderId != null) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(message = "Create Order Successfully!", actionLabel = SnackbarType.SUCCESS.name)
+                                    }
+
+                                    println("➡️ Navigating to order/$orderId")
+                                    navController.navigate("order/${orderId}")
+                                } else {
+                                    Toast.makeText(context, message ?: "Unknown error", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
-//                        navController.navigate(Destinations.Order)
+
                     },
                     modifier = Modifier
                         .fillMaxWidth()

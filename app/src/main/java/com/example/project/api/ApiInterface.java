@@ -59,11 +59,20 @@ public interface ApiInterface {
     Call<List<StoreLocationResponse>> getAllStoreLocation();
 
     @POST("Order")
-    Call<Void> createOrder(
-            @Query("userId") int userId,
-            @Query("paymentMethod") String paymentMethod,
-            @Query("address") String address
+    Call<OrderResponse> createOrder(
+           @Body CreateOrderRequest request
     );
+
+    @POST("Checkout/create-payment-link")
+    Call<PaymentResponse> createPaymentLink(@Body PaymentRequest request);
+
+    @GET("Checkout/success")
+    Call<PaymentStatusResponse> checkPaymentSuccess();
+
+    @GET("Order")
+    Call<List<OrderHistory>> getOrderHistory();
+
+
 
 
 }

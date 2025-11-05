@@ -179,19 +179,9 @@ fun ProductDetail(
                         modifier = Modifier.weight(1f).height(56.dp),
                         colors = ButtonDefaults.buttonColors(Color(0xFF6588E6)),
                         shape = RoundedCornerShape(16.dp)
-                    ) { Text("Buy Now", color = Color.White, style = MaterialTheme.typography.titleMedium) }
+                    ) { Text("Add to cart", color = Color.White, style = MaterialTheme.typography.titleMedium) }
 
-                    Spacer(modifier = Modifier.width(16.dp))
 
-                    OutlinedButton(
-                        onClick = onAddToCart,
-                        modifier = Modifier.size(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(1.dp, Color(0xFF6588E6)),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Icon(Icons.Default.ShoppingCart, contentDescription = "Add to Cart", tint = AccentBlue, modifier = Modifier.size(32.dp))
-                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

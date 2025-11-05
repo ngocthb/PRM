@@ -1,160 +1,187 @@
 package com.example.project.ui.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-
-import com.example.project.ui.screens.components.*
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import coil.compose.rememberAsyncImagePainter
-import com.example.project.model.Chat
-import com.example.project.ui.screens.components.BottomNavigationBar
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
-    navController: NavHostController
+    navController: NavHostController,
+    chatUserName: String = "Admin"
 ) {
     val primaryColor = Color(0xFF6588E6)
+    val focusManager = LocalFocusManager.current
 
-    val recentChats = listOf(
-        Chat(1, "Bella", "Typing...", "2:15", "https://i.pravatar.cc/150?img=1"),
-        Chat(2, "Bee", "Ok, take care dear", "11:25", "https://i.pravatar.cc/150?img=2"),
-        Chat(3, "Anne", "Where’re you?", "5:30", "https://i.pravatar.cc/150?img=3"),
-        Chat(4, "Mommy", "Don’t forget to use your mask", "4:10", "https://i.pravatar.cc/150?img=4"),
-    )
-
-    val allChats = listOf(
-        Chat(5, "Victoria", "I’m otw, wait for a few mins", "6:30", "https://i.pravatar.cc/150?img=5"),
-        Chat(6, "Daddy", "I’ll be home tomorrow", "7:00", "https://i.pravatar.cc/150?img=6"),
-    )
+    // Danh sách tin nhắn
+    var messages by remember {
+        mutableStateOf(
+            listOf(
+                "Xin chào! Bạn cần hỗ trợ gì không?",
+                "Cho tôi hỏi về đơn hàng của tôi nhé.",
+                "Vâng, chúng tôi đang kiểm tra giúp bạn..."
+            )
+        )
+    }
+    var currentMessage by remember { mutableStateOf("") }
 
     Scaffold(
-        containerColor = Color(0xFFFAFAFA),
-        bottomBar = { BottomNavigationBar(navController) }
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(chatUserName, fontWeight = FontWeight.Bold, color = primaryColor)
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.Blue,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            navController.navigate("shop_map")
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Map,
+                            contentDescription = "Map",
+                            tint = Color(0xFF6588E6),
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
+            )
+        },
+        containerColor = Color(0xFFF8F9FE)
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .padding(horizontal = 12.dp)
+                // 👇 Khi chạm ra ngoài ô nhập thì ẩn bàn phím
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = {
+                        focusManager.clearFocus()
+                    })
+                }
         ) {
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp)
-            ) {
-
-                Text(
-                    text = "Chat",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = primaryColor,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            }
-
-
-
-            // 🔹 Danh sách chat
+            // Danh sách tin nhắn
             LazyColumn(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                item { SectionHeader("Recent Chats") }
-                items(recentChats) { chat ->
-                    ChatRow(chat) {
-                        navController.navigate("chat_detail/${chat.chatID}")
-                    }
+                items(messages) { message ->
+                    MessageBubble(
+                        text = message,
+                        isUser = message.contains("tôi") || message.contains("đơn hàng")
+                    )
                 }
+            }
 
-                item { SectionHeader("All Chats") }
-                items(allChats) { chat ->
-                    ChatRow(chat) {
-                        navController.navigate("chat_detail/${chat.chatID}")
-                    }
+            // Nhập tin nhắn
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = currentMessage,
+                    onValueChange = { currentMessage = it },
+                    placeholder = { Text("Nhập tin nhắn...") },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp),
+                    shape = RoundedCornerShape(24.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = {
+                        if (currentMessage.isNotBlank()) {
+                            messages = messages + currentMessage
+                            currentMessage = ""
+                            focusManager.clearFocus() // 👈 Ẩn bàn phím sau khi gửi
+                        }
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(primaryColor)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Send,
+                        contentDescription = "Send",
+                        tint = Color.White
+                    )
                 }
             }
         }
     }
 }
 
-
+/**
+ * ✅ Tin nhắn (hiển thị trái/phải tùy người gửi)
+ */
 @Composable
-fun SectionHeader(title: String) {
+fun MessageBubble(text: String, isUser: Boolean) {
+    val bgColor = if (isUser) Color(0xFF6588E6) else Color.White
+    val textColor = if (isUser) Color.White else Color.Black
+
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .fillMaxWidth(),
+        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = Color.Black
-        )
-
-    }
-}
-
-@Composable
-fun ChatRow(chat: Chat, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Image(
-            painter = rememberAsyncImagePainter(chat.avatarUrl),
-            contentDescription = chat.userName,
+        Box(
             modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = chat.userName,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                color = Color.Black
-            )
-            Text(
-                text = chat.lastMessage,
-                style = if (chat.lastMessage.lowercase().contains("typing"))
-                    MaterialTheme.typography.bodyMedium.copy(color = Color.Gray, fontStyle = FontStyle.Italic)
-                else
-                    MaterialTheme.typography.bodyMedium.copy(color = Color.Gray),
-                maxLines = 1
-            )
+                .widthIn(max = 260.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomEnd = if (isUser) 0.dp else 16.dp,
+                        bottomStart = if (isUser) 16.dp else 0.dp
+                    )
+                )
+                .background(bgColor)
+                .padding(12.dp)
+        ) {
+            Text(text = text, color = textColor)
         }
-
-        Text(
-            text = chat.lastSentAt,
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.Gray
-        )
     }
 }

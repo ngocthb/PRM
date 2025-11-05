@@ -8,7 +8,7 @@ public class TokenManager {
     private static final String KEY_TOKEN = "key_token";
     private static final String KEY_USER_ID = "key_user_id";
     private static final String KEY_TOKEN_EXPIRY = "key_token_expiry";
-
+    private static final String KEY_USER_ADDRESS = "key_user_address";
     private static final long TOKEN_VALIDITY_MS = 3 * 60 * 60 * 1000L; // 3h
 
     private static TokenManager instance;
@@ -58,6 +58,15 @@ public class TokenManager {
         }
     }
 
+    public String getUserAddress() {
+        long expiry = prefs.getLong(KEY_TOKEN_EXPIRY, 0);
+        if (System.currentTimeMillis() < expiry) {
+            return prefs.getString(KEY_USER_ADDRESS, null);
+        } else {
+            clear();
+            return null;
+        }
+    }
     public boolean isTokenValid() {
         long expiry = prefs.getLong(KEY_TOKEN_EXPIRY, 0);
         return System.currentTimeMillis() < expiry;

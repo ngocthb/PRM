@@ -19,7 +19,7 @@ data class CartUiState(
     val items: List<CartItemDto> = emptyList(),
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val totalPrice: Double = 0.0
+    val totalPrice: Double = 0.0,
 )
 
 class CartViewModel(application: Application) : AndroidViewModel(application) {
@@ -164,31 +164,46 @@ class CartViewModel(application: Application) : AndroidViewModel(application) {
 
     /** tạo order */
     fun createOrder(
-        userId: Int,
-        paymentMethod: String,
-        address: String,
-        onResult: (Boolean, String?) -> Unit
+        createOrderRequest : CreateOrderRequest ,
+        onResult: (Boolean, String?, Int?) -> Unit
     ) {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
-        api.createOrder(userId, paymentMethod, address)
-            .enqueue(object : Callback<Void> {
-                override fun onResponse(call: Call<Void>, response: Response<Void>) {
+        println("🟦 [DEBUG] createOrder() called with userId=${createOrderRequest.userId}, paymentMethod=${createOrderRequest.paymentMethod}, address=${createOrderRequest.address}")
+
+        api.createOrder(createOrderRequest)
+            .enqueue(object : Callback<OrderResponse> {
+                override fun onResponse(call: Call<OrderResponse>, response: Response<OrderResponse>) {
                     _uiState.update { it.copy(isLoading = false) }
-                    if (response.isSuccessful) {
-                        onResult(true, "Order created successfully")
+
+                    println("🟨 [DEBUG] API responded: code=${response.code()}, success=${response.isSuccessful}")
+
+                    if (response.isSuccessful && response.body() != null) {
+                        val order = response.body()!!
+                        println("🟩 [DEBUG] Response body: $order")
+                        val orderId = order.orderId
+                        println("🟢 [DEBUG] Extracted orderId=$orderId")
+
+                        onResult(true, "Order created successfully", orderId)
                     } else {
-                        val msg = try { response.errorBody()?.string() } catch (_: Exception) { null }
-                        onResult(false, msg ?: "Failed to create order (${response.code()})")
+                        val msg = try {
+                            response.errorBody()?.string()
+                        } catch (_: Exception) {
+                            null
+                        }
+                        println("🟥 [DEBUG] API failed: msg=$msg, code=${response.code()}")
+                        onResult(false, msg ?: "Failed to create order (${response.code()})", null)
                     }
                 }
 
-                override fun onFailure(call: Call<Void>, t: Throwable) {
+                override fun onFailure(call: Call<OrderResponse>, t: Throwable) {
                     _uiState.update { it.copy(isLoading = false) }
-                    onResult(false, "Network error: ${t.message}")
+                    println("🔴 [DEBUG] Network error: ${t.message}")
+                    onResult(false, "Network error: ${t.message}", null)
                 }
             })
     }
+
 
 
     /** Cập nhật badge số lượng cart trên icon app */

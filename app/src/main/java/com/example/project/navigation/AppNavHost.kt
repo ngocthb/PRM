@@ -20,7 +20,8 @@ import com.example.project.ui.viewmodel.LoginViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppNavHost(navController: NavHostController = rememberNavController()) {
+fun AppNavHost(navController: NavHostController = rememberNavController(),     userLat: Double? = null,
+               userLng: Double? = null) {
     val loginViewModel: LoginViewModel = viewModel()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -139,7 +140,8 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
 
             // Cart
             composable(Destinations.Cart) {
-                CartScreen(navController = navController)
+                CartScreen(navController = navController, snackbarHostState = snackbarHostState, // ✅ truyền xuống
+                    scope = scope)
             }
 
             // Profile
@@ -147,7 +149,6 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 ProfileScreen(navController = navController,
                     onLogout = {
                         navController.navigate(Destinations.Login) {
-                            // xóa back stack để user không back về các màn đã auth
                             popUpTo(navController.graph.startDestinationId) { inclusive = true }
                             launchSingleTop = true
                         }
@@ -178,10 +179,30 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             }
 
             // Order Screen
-            composable(route = Destinations.Order) {
-                OrderScreen(navController = navController)
+            composable(
+                route = "${Destinations.Order}/{orderId}",
+                arguments = listOf(navArgument("orderId") { type = NavType.IntType })
+            ) { backStackEntry ->
+                val orderId = backStackEntry.arguments?.getInt("orderId")?:0
+                if (orderId != 0) {
+                    OrderScreen(navController = navController, orderId = orderId)
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No order selected")
+                    }
+                }
+
+            }
+            composable(Destinations.User) {
+                UserScreen(navController = navController)
             }
 
+            composable(Destinations.History) {
+                OrderHistoryScreen(navController = navController)
+            }
 
         }
     }
