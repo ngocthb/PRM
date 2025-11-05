@@ -162,6 +162,35 @@ class CartViewModel(application: Application) : AndroidViewModel(application) {
         })
     }
 
+    /** tạo order */
+    fun createOrder(
+        userId: Int,
+        paymentMethod: String,
+        address: String,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+        api.createOrder(userId, paymentMethod, address)
+            .enqueue(object : Callback<Void> {
+                override fun onResponse(call: Call<Void>, response: Response<Void>) {
+                    _uiState.update { it.copy(isLoading = false) }
+                    if (response.isSuccessful) {
+                        onResult(true, "Order created successfully")
+                    } else {
+                        val msg = try { response.errorBody()?.string() } catch (_: Exception) { null }
+                        onResult(false, msg ?: "Failed to create order (${response.code()})")
+                    }
+                }
+
+                override fun onFailure(call: Call<Void>, t: Throwable) {
+                    _uiState.update { it.copy(isLoading = false) }
+                    onResult(false, "Network error: ${t.message}")
+                }
+            })
+    }
+
+
     /** Cập nhật badge số lượng cart trên icon app */
     private fun updateCartBadge() {
         val count = _uiState.value.items.sumOf { it.quantity }

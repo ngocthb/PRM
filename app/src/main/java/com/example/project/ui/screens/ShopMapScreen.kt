@@ -8,7 +8,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ButtonDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
@@ -21,7 +23,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.project.R
+import com.example.project.model.StoreLocationResponse
+import com.example.project.ui.viewmodel.StoreLocationViewModel
 import com.mapbox.geojson.Feature
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
@@ -34,46 +39,27 @@ import com.mapbox.maps.extension.compose.style.standard.MapboxStandardStyle
 import com.mapbox.maps.extension.compose.style.standard.ThemeValue
 import com.mapbox.maps.extension.compose.style.standard.rememberStandardStyleState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
-
-data class ShopLocation(
-    val name: String,
-    val address: String,
-    val phone: String,
-    val openHours: String,
-    val latitude: Double,
-    val longitude: Double
-)
 
 class ShopMapActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ShopMapScreen(
-                onBack = { finish() } // finish Activity khi bấm back
-            )
+            ShopMapScreen(onBack = { finish() })
         }
     }
 }
-
 @Composable
 fun ShopMapScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val primaryColor = Color(0xFF5B5FEF)
-    val shop = ShopLocation(
-        name = "Shop Hà Nội",
-        address = "123 Hoàn Kiếm, Hà Nội",
-        phone = "0123456789",
-        openHours = "8:00 - 22:00",
-        latitude = 21.0278,
-        longitude = 105.8342
-    )
 
-    // Fake user location gần Hà Nội
-    val fakeUserLat = 21.0300
-    val fakeUserLng = 105.8350
+    // Fake user location (có thể thay bằng GPS sau)
+    val fakeUserLat = 10.77653
+    val fakeUserLng = 106.700981
     val userLocation = remember { Point.fromLngLat(fakeUserLng, fakeUserLat) }
 
     var showRoute by remember { mutableStateOf(false) }
@@ -85,9 +71,19 @@ fun ShopMapScreen(onBack: () -> Unit) {
         painter = painterResource(R.drawable.ic_location_blue)
     )
 
-    // Lấy route từ Mapbox Directions API khi nhấn button
-    LaunchedEffect(showRoute) {
-        if (showRoute) {
+    // ViewModel gọi API
+    val storeViewModel: StoreLocationViewModel = viewModel()
+    val storeState by storeViewModel.uiState.collectAsState()
+
+    // Gọi API load dữ liệu khi mở màn hình
+    LaunchedEffect(Unit) {
+        storeViewModel.loadStoreLocations()
+    }
+
+    // Vẽ route (demo: từ user đến cửa hàng đầu tiên)
+    LaunchedEffect(showRoute, storeState.locations) {
+        if (showRoute && storeState.locations.isNotEmpty()) {
+            val shop = storeState.locations.first()
             fetchRouteFromMapbox(
                 start = listOf(fakeUserLng, fakeUserLat),
                 destination = listOf(shop.longitude, shop.latitude)
@@ -98,12 +94,18 @@ fun ShopMapScreen(onBack: () -> Unit) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        val firstShop = storeState.locations.firstOrNull()
+
         MapboxMap(
             modifier = Modifier.fillMaxSize(),
             mapViewportState = rememberMapViewportState {
                 setCameraOptions {
-                    zoom(16.0)
-                    center(Point.fromLngLat(shop.longitude, shop.latitude))
+                    zoom(14.0)
+                    center(
+                        firstShop?.let {
+                            Point.fromLngLat(it.longitude, it.latitude)
+                        } ?: userLocation
+                    )
                 }
             },
             style = {
@@ -114,34 +116,44 @@ fun ShopMapScreen(onBack: () -> Unit) {
                 )
             }
         ) {
-            // Shop marker
-            PointAnnotation(point = Point.fromLngLat(shop.longitude, shop.latitude)) {
-                iconImage = shopMarkerIcon
-                textField = shop.name
-                interactionsState.onClicked {
-                    Toast.makeText(
-                        context,
-                        "${shop.name}\n${shop.address}\n${shop.phone}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    true
+            // Hiển thị marker của từng cửa hàng từ API
+            val coroutineScope = rememberCoroutineScope()
+            storeState.locations.forEach { shop ->
+                val shopPoint = Point.fromLngLat(shop.longitude, shop.latitude)
+
+                PointAnnotation(
+                    point = shopPoint,
+                    onClick = {
+                        coroutineScope.launch {
+                            val route = fetchRouteFromMapbox(
+                                start = listOf(userLocation.longitude(), userLocation.latitude()),
+                                destination = listOf(shop.longitude, shop.latitude)
+                            )
+                            routeFeature = route
+                            showRoute = route != null
+                        }
+                        true
+                    }
+                ) {
+                    iconImage = shopMarkerIcon
                 }
             }
 
-            if (showRoute) {
-                // User marker
-                PointAnnotation(point = userLocation) {
-                    iconImage = userMarkerIcon
-                    textField = "Bạn ở đây"
-                }
+            // --- Marker người dùng ---
+            PointAnnotation(point = userLocation) {
+                iconImage = userMarkerIcon
+                iconSize = 1.2 // to hơn shop
+                textField = "Bạn ở đây"
+                textSize = 12.0
+                textOffset = listOf(0.0, -2.0)
+            }
 
-                // Route polyline
+            if (showRoute) {
+                // Đường đi
                 routeFeature?.geometry()?.let { geometry ->
                     if (geometry is LineString) {
-                        PolylineAnnotation(
-                            points = geometry.coordinates()
-                        ) {
-                            lineColor = Color(0xFF3B82F6)  // màu xanh
+                        PolylineAnnotation(points = geometry.coordinates()) {
+                            lineColor = Color(0xFF3B82F6)
                             lineWidth = 4.0
                             lineOpacity = 0.8
                         }
@@ -150,7 +162,7 @@ fun ShopMapScreen(onBack: () -> Unit) {
             }
         }
 
-        // Nút Back (trên trái)
+        // Nút Back
         IconButton(
             onClick = { onBack() },
             modifier = Modifier
@@ -158,39 +170,32 @@ fun ShopMapScreen(onBack: () -> Unit) {
                 .size(48.dp)
                 .background(Color(0xFF6588E6), CircleShape)
         ) {
-         Icon(
+            Icon(
                 imageVector = Icons.Default.ArrowBack,
                 contentDescription = "Back",
                 tint = Color.White
             )
         }
 
-        // Button hiển thị vị trí người dùng + đường đi (dưới)
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 30.dp, vertical = 24.dp)
-                .align(Alignment.BottomCenter)
-                .offset(y = (-60).dp)
-        ) {
-            androidx.compose.material.Button(
-                onClick = { showRoute = true },
+        // xóa đường đi
+        if (showRoute) {
+            Button(
+                onClick = {
+                    showRoute = false
+                    routeFeature = null
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = Color(0xFF3B82F6)
+                ),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp), // chiều cao button giữ nguyên
-                colors = ButtonDefaults.buttonColors(backgroundColor = primaryColor),
-                shape = RoundedCornerShape(12.dp)
+                    .align(Alignment.TopEnd)
+                    .padding(top = 38.dp, end = 16.dp)
             ) {
-                androidx.compose.material.Text(
-                    "Hiển thị đường đi",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text("Xóa đường đi", fontSize = 13.sp, fontWeight = FontWeight.Medium)
             }
         }
-
 
     }
 }

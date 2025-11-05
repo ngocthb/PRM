@@ -1,5 +1,6 @@
 package com.example.project.ui.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -25,7 +26,10 @@ import androidx.compose.ui.platform.LocalContext
 
 import com.example.project.ui.viewmodel.CartViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.project.api.ApiServices
+import com.example.project.api.TokenManager
 import com.example.project.model.CartItemDto
+import com.example.project.model.OrderRequest
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -119,9 +123,25 @@ fun CartScreen(navController: NavHostController, viewModel: CartViewModel = view
                 }
 
                 // Checkout button
+                val context = LocalContext.current
+                val tokenManager = TokenManager.getInstance(context)
+                val userId = tokenManager.getUserId().toInt()
+
                 Button(
                     onClick = {
-
+                        viewModel.createOrder(
+                            userId = userId,
+                            paymentMethod = "PayOS",
+                            address = "123 ABC Street"
+                        ) { success, message ->
+                            if (success) {
+                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                navController.navigate("order")
+                            } else {
+                                Toast.makeText(context, message ?: "Unknown error", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+//                        navController.navigate(Destinations.Order)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -137,6 +157,7 @@ fun CartScreen(navController: NavHostController, viewModel: CartViewModel = view
                         fontSize = 16.sp
                     )
                 }
+
             }
         }
     }

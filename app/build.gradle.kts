@@ -58,6 +58,8 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.1.1")
     implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
 
+    implementation("com.google.android.gms:play-services-location:21.0.1")
+
     implementation("com.mapbox.maps:android-ndk27:11.15.1")
     implementation("com.mapbox.extension:maps-compose-ndk27:11.15.1")
     implementation("com.google.code.gson:gson:2.13.2")

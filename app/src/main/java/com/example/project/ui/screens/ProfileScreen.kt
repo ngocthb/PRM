@@ -49,7 +49,10 @@ fun ProfileScreen(
     // Build options; logout uses a confirmation dialog
     val options = listOf(
         ProfileOption("Edit Profile", Icons.Outlined.Person, Color(0xFF4CAF50)) { /* TODO */ },
-        ProfileOption("Shopping Address", Icons.Outlined.LocationOn, Color(0xFFFF9800)) { /* TODO */ },
+//        ProfileOption("Shopping Address", Icons.Outlined.LocationOn, Color(0xFFFF9800)) { /* TODO */ },
+        ProfileOption("Shopping Address", Icons.Outlined.LocationOn, Color(0xFFFF9800)) {
+            navController.navigate(Destinations.ShopMap)
+        },
         ProfileOption("Wishlist", Icons.Outlined.Favorite, Color(0xFFF44336)) { /* TODO */ },
         ProfileOption("Order History", Icons.Outlined.List, Color(0xFF2196F3)) { /* TODO */ },
         ProfileOption("Notification", Icons.Outlined.Notifications, Color(0xFFFFC107)) { /* TODO */ },

@@ -11,6 +11,7 @@ import retrofit2.http.GET;
 import retrofit2.http.POST;
 import retrofit2.http.PUT;
 import retrofit2.http.Path;
+import retrofit2.http.Query;
 
 public interface ApiInterface {
     @POST("Auth/register")   // hoặc "register" tuỳ backend bạn dùng baseUrl
@@ -29,8 +30,6 @@ public interface ApiInterface {
    Call<ProductDetailResponse> getProductById(
            @Path("id") int id
     );
-
-
 
     @GET("Product/all")
     Call<List<ProductResponse>> getProducts();
@@ -55,6 +54,16 @@ public interface ApiInterface {
 
     @POST("Cart/remove")
     Call<Void> removeToCart (@Body CartRequest request);
+
+    @GET("StoreLocation/GetAllLocations")
+    Call<List<StoreLocationResponse>> getAllStoreLocation();
+
+    @POST("Order")
+    Call<Void> createOrder(
+            @Query("userId") int userId,
+            @Query("paymentMethod") String paymentMethod,
+            @Query("address") String address
+    );
 
 
 }

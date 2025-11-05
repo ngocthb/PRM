@@ -39,8 +39,6 @@ fun CategoryTabs(
     selectedCategoryId: Int?,
     onCategoryClick: (Int) -> Unit
 ) {
-
-
     val iconForCategory: (Int) -> ImageVector = { id ->
         when (id) {
             1 -> Icons.Outlined.Checkroom    // Áo

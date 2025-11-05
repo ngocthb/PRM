@@ -10,4 +10,5 @@ object Destinations {
     const val Profile = "profile"
     const val ShopProfile = "shop_profile"
     const val ShopMap = "shop_map"
+    const val Order = "order"
 }
